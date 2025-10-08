@@ -1,1 +1,13 @@
-
+{
+  "name": "Dkz",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp sederhana Dkz",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Dkz",
+  "license": "MIT",
+  "dependencies": {
+    "@adiwajshing/baileys": "^5.0.0",
+    "pino": "^8
