@@ -1,13 +1,18 @@
 {
-  "name": "Dkz",
+  "name": "DizBot1",
   "version": "1.0.0",
-  "description": "Bot WhatsApp sederhana Dkz",
+  "description": "WhatsApp bot using Baileys - DizBot1",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
-  "author": "Dkz",
+  "author": "",
   "license": "MIT",
   "dependencies": {
-    "@adiwajshing/baileys": "^5.0.0",
-    "pino": "^8
+    "@whiskeysockets/baileys": "^6.7.18",
+    "pino": "^8.10.0",
+    "qrcode-terminal": "^0.12.0",
+    "@hapi/boom": "^10.0.0"
+  }
+}
