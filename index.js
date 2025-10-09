@@ -1,12 +1,17 @@
-import makeWASocket, {
+// index.js
+import baileys from "@whiskeysockets/baileys"
+import P from "pino"
+import { Boom } from "@hapi/boom"
+import readline from "readline"
+import qrcode from "qrcode-terminal"
+
+const {
+  default: makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
-  makeInMemoryStore,
-} from '@whiskeysockets/baileys'
-import P from 'pino'
-import { Boom } from '@hapi/boom'
-import readline from 'readline'
+  makeInMemoryStore
+} = baileys
 
 async function start() {
   try {
@@ -25,11 +30,13 @@ async function start() {
     store.bind(conn.ev)
 
     conn.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect, pairingCode } = update
+      const { connection, lastDisconnect, qr, pairingCode } = update
 
       if (pairingCode) {
         console.log(`🔗 Pairing Code: ${pairingCode}`)
-        console.log('Masukkan kode ini di WhatsApp > Perangkat tertaut > Tautkan dengan kode.')
+        console.log('Masukkan kode ini di WhatsApp > Perangkat tertaut > Tautkan dengan kode')
+      } else if (qr) {
+        qrcode.generate(qr, { small: true })
       }
 
       if (connection === 'close') {
@@ -47,7 +54,7 @@ async function start() {
 
     conn.ev.on('creds.update', saveCreds)
 
-    // ==== fitur .brat ====
+    // fitur .brat
     const bratTexts = [
       '💢 Kamu tuh ngeselin banget, tapi aku suka 😤',
       '🙄 Dasar si brat, ganggu terus!',
