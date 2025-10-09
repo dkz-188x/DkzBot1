@@ -1,76 +1,81 @@
+import makeWASocket, {
+  useMultiFileAuthState,
+  fetchLatestBaileysVersion,
+  DisconnectReason,
+  makeInMemoryStore,
+} from '@whiskeysockets/baileys'
+import P from 'pino'
+import { Boom } from '@hapi/boom'
+import readline from 'readline'
 
-const { default: makeWASocket, useSingleFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = require("@adiwajshing/baileys")
-const P = require("pino")
-
-// Session sudah tersimpan, cukup copy file auth_info.json dari device lain
-const { state, saveState } = useSingleFileAuthState('./auth_info.json')
-
-async function startBot(pairingCode) {
+async function start() {
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState('./auth_info')
     const { version } = await fetchLatestBaileysVersion()
-    
-    // Optional: cek pairing code
-    if(pairingCode !== "YOUR_SECRET_CODE") {
-        console.log("❌ Kode pairing salah! Bot tidak dijalankan.")
-        return
-    }
 
     const conn = makeWASocket({
-        printQRInTerminal: false, // QR tidak tampil
-        auth: state,
-        version,
-        logger: P({ level: 'silent' })
+      logger: P({ level: 'silent' }),
+      printQRInTerminal: false,
+      auth: state,
+      version,
+      browser: ['DizBot1', 'Chrome', '1.0.0']
     })
 
-    conn.ev.on('creds.update', saveState)
+    const store = makeInMemoryStore({ logger: P({ level: 'silent' }) })
+    store.bind(conn.ev)
 
-    let verifiedUsers = {}
-    let userData = {}
+    conn.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, pairingCode } = update
 
-    conn.ev.on('messages.upsert', async ({ messages }) => {
-        const msg = messages[0]
-        if(!msg.message || msg.key.fromMe) return
+      if (pairingCode) {
+        console.log(`🔗 Pairing Code: ${pairingCode}`)
+        console.log('Masukkan kode ini di WhatsApp > Perangkat tertaut > Tautkan dengan kode.')
+      }
 
-        const jid = msg.key.remoteJid
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || ""
-        const sender = msg.key.participant || msg.key.remoteJid
-
-        // VERIFIKASI
-        if(text.startsWith(".verify")) {
-            verifiedUsers[sender] = true
-            if(!userData[sender]) userData[sender] = { nama: msg.pushName || "User", level: 1, exp: 0 }
-            await conn.sendMessage(jid, { text: "✅ Kamu sudah terverifikasi!" })
-            return
+      if (connection === 'close') {
+        const reason = new Boom(lastDisconnect?.error).output?.statusCode
+        if (reason !== DisconnectReason.loggedOut) {
+          console.log('Reconnect...')
+          start()
+        } else {
+          console.log('Logged out, hapus folder auth_info dan pairing ulang.')
         }
-
-        if(!verifiedUsers[sender]) {
-            await conn.sendMessage(jid, { text: "⚠️ Ketik .verify untuk bisa menggunakan bot." })
-            return
-        }
-
-        // MENU
-        if(text === ".menu") {
-            let nama = msg.pushName || "User"
-            let menu = `...` // copy menu dari script-mu
-            await conn.sendMessage(jid, { text: menu })
-            return
-        }
-
-        // ME
-        if(text === ".me") {
-            let profile = userData[sender]
-            let meMsg = `
-╭─「 USER PROFILE 」  
-│ • Nama : ${profile.nama}  
-│ • Level: ${profile.level}  
-│ • Exp  : ${profile.exp}  
-╰────────────────
-            `
-            await conn.sendMessage(jid, { text: meMsg })
-            return
-        }
-
+      } else if (connection === 'open') {
+        console.log('✅ DizBot1 connected via Pairing Code!')
+      }
     })
+
+    conn.ev.on('creds.update', saveCreds)
+
+    // ==== fitur .brat ====
+    const bratTexts = [
+      '💢 Kamu tuh ngeselin banget, tapi aku suka 😤',
+      '🙄 Dasar si brat, ganggu terus!',
+      '😾 Brat detected, siap-siap digigit!',
+      '😤 Kamu pikir kamu lucu, hah brat?',
+      '😒 Brat mode on, dunia siap berantakan~'
+    ]
+
+    conn.ev.on('messages.upsert', async (m) => {
+      const msg = m.messages[0]
+      if (!msg.message || msg.key.fromMe) return
+      const from = msg.key.remoteJid
+      const text =
+        msg.message.conversation ||
+        msg.message.extendedTextMessage?.text ||
+        ''
+
+      if (!text.startsWith('.')) return
+      const command = text.slice(1).trim().toLowerCase()
+
+      if (command === 'brat') {
+        const reply = bratTexts[Math.floor(Math.random() * bratTexts.length)]
+        await conn.sendMessage(from, { text: reply }, { quoted: msg })
+      }
+    })
+  } catch (err) {
+    console.error('Start failed:', err)
+  }
 }
 
-// Jalankan bot hanya jika memasukkan kode pairing
-startBot("YOUR_SECRET_CODE")
+start()
